@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComBridge - Sign Language Translator</title>
+
+    <!-- Google Fonts for modern typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #2c3e50; /* Blueish-black background */
+            color: #ecf0f1; /* Light text for contrast */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow-y: auto; /* Enable vertical scrolling */
+    
+        }
+
+        /* Modern Container Styling */
+        .container {
+            max-width: 1000px;
+            width: 90%;
+            background-color: #34495e;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            padding-top: 10%;
+        }
+
+        /* Flexbox layout for camera and gesture display */
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .flex-row > div {
+            flex: 1;
+            background-color: #3b4a66; 
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        input {
+            width: 95%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 1rem;
+            background-color: #2e4057;
+            color: #ffffff;
+            outline: none;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        button {
+            background-color: #1abc9c;
+            color: #ffffff;
+            border: none;
+            padding: 15px 20px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        button:hover {
+            background-color: #16a085;
+        }
+
+        /* Video and Image Styling */
+        #video {
+            width: 100%;
+            border-radius: 15px;
+            border: 2px solid #16a085;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            height: 20%;
+        }
+
+        #gesture-display {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            margin-top: 20px;
+            width: 200px;
+            height: 150px;
+            border: 1px solid #ccc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;  /* Ensure content is clipped if it exceeds container */
+            background-color: #f9f9f9; /* Add a light background color for visibility */
+            padding-bottom: 20%;
+        }
+
+        #gesture-display img {
+            width: 100px;
+            height: 100px;
+            margin: 10px;
+            border-radius: 10px;
+            transition: transform 0.3s ease;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        #gesture-display img:hover {
+            transform: scale(1.1);
+        }
+
+        #recognized-gesture {
+            font-size: 1.2rem;
+            text-align: center;
+            color: #1abc9c;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .gesture-image {
+            max-width: 100%; /* Ensure image fits within the container */
+            max-height: 100%; /* Ensure image fits within the container */
+        }
+
+        /* Responsive for smaller screens */
+        @media only screen and (max-width: 768px) {
+            .flex-row {
+                flex-direction: column;
+            }
+
+            textarea, button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Communication Bridge AI</h1>
+
+        <!-- Flex row for Camera and Gesture Display -->
+        <div class="flex-row">
+            <!-- Camera feed section on the left -->
+            <div id="camera-section">
+                <h2 style="color: #ecf0f1; text-align: center;">Ho tloha ho Pontšo hoea ho Mongolo</h2>
+                <div>
+                    <img id="video" src="" alt="Papatso" />
+                </div><br>
+                <!-- <video id="videoElement" autoplay></video><br> -->
+                <button id="video_start">📸 Nka Liponts'o</button>
+                <div id="gestures" contenteditable="true">
+                    Pontšo e fumanoeng: 
+                </div>
+                <!-- <button onclick="deleteHighlightedWord()">Hlakola</button> -->
+            </div>
+
+            <!-- Speech to Sign Language Section -->
+            <div id="right-section">
+                <h2 style="color: #ecf0f1; text-align: center;">Ho tloha ho Mongolo hoea ho Pontšo</h2><br>
+                <div id="gesture-display"></div>
+                <input id="user_input" type="text" name="text_input" required, placeholder="Mongolo => Pontšo...">
+                <p id="warningMessage" style="color: red;"></p>
+                <P id="typed_text">Mongolo o fetoloang: </P>
+                <button id="sent-text" type="submit" onclick="sendText()">Mongolo => Pontšo</button>
+                
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        let videoRunning = false;
+
+        function UpdateTypedText(){
+            // const typed_text = document.getElementById('typed_text');
+            var typed_text = document.getElementById("user_input").value;
+
+            // if (typed_text.value != " "){
+            //     document.getElementById("typed_text").innerHTML = "Input Text: " + typed_text;
+            // }
+
+            // Check if the input is empty
+            if (typed_text.trim() === "") {
+                // document.getElementById("user_input").innerHTML = "At least type something!!!";
+                document.getElementById("warningMessage").innerHTML = "Bonyane Ngola hohong!!!";
+                document.getElementById("typed_text").innerHTML = ""; // Clear displayText if no input
+            } else {
+                // Update the paragraph text with the input
+                document.getElementById("typed_text").innerHTML = "Input Text: " + typed_text;
+                // document.getElementById("displayText").innerHTML = "Input Text: " + inputText;
+                document.getElementById("warningMessage").innerHTML = ""; // Clear warning message
+            }
+        }
+
+        // function fetchGestures() {
+
+        //     fetch('/get_constructed_word')
+        //         .then(response => response.json())
+        //         .then(data => {
+        //             const gesturesDiv = document.getElementById('gestures');
+
+        //             console.log(data.gestures)
+                    
+
+        //             if (data.gestures.length > 0) {
+        //                 gesturesDiv.innerText = "Detected Gestures: " + data.gestures.join("");
+        //             }
+        //         })
+        //         .catch(error => {
+        //             console.error('Error fetching gestures:', error);
+        //         });
+        // }
+
+        
+        function fetchGestures() {
+            fetch('/get_constructed_word')
+                .then(response => response.json())
+                .then(data => {
+                    const gesturesDiv = document.getElementById('gestures');
+
+                    console.log(data.gestures);
+
+                    // If deletion is detected, fetch from the '/update_constructed_word' route
+                    if (data.is_deleted) {
+                        console.log("Fatching in updates")
+                        fetch('/update_constructed_word', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ updated_word: data.gestures.join('') }) // Send the updated word
+                        })
+                        .then(response => response.json())
+                        .then(updateData => {
+                            gesturesDiv.innerText = "mongolo o mocha: " + updateData.updated_word;
+                        })
+                        .catch(error => {
+                            console.error('Error fetching updated word:', error);
+                        });
+                    } else {
+                        console.log("still Fatching in old")
+                        if (data.gestures.length > 0) {
+                            gesturesDiv.innerText = "Mongolo o fumanehileng: " + data.gestures.join("");
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching gestures:', error);
+                });
+        }
+
+
+        setInterval(fetchGestures, 2000);  // Fetch gestures every 2 seconds
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('video_start').addEventListener('click', () => {
+                console.log("The Start button clicked")
+                if (videoRunning) {
+                    document.getElementById('video').src = ""; // Stop the feed
+                    videoRunning = false;
+                    document.getElementById('video_start').innerText = "📸 Nka Liponts'o";
+                    
+                } else {
+                    document.getElementById('video').src = "{{ url_for('video_feed') }}"; // Start the feed
+                    videoRunning = true;
+                    console.log("video started")
+                    document.getElementById('video_start').innerText = "Emisa Papatso";
+                }
+            });
+        });
+
+        function sendText() {
+            UpdateTypedText()
+            const inputField = document.querySelector('input[name="text_input"]');
+            const userInput = inputField.value;
+
+            socket.emit('process_text', { text_input: userInput });
+            inputField.value = ''; // Clear the input field
+        }
+
+        socket.on('new_gesture', function(data) {
+            const gestureDisplay = document.getElementById('gesture-display');
+            gestureDisplay.innerHTML = ''; // Clear previous image
+            
+            const img = document.createElement('img');
+            img.src = data.path;  // Use the path returned by the server
+            img.className = 'gesture-image';
+
+            img.onload = () => {
+                console.log("Image loaded successfully"); // Confirm image loading
+            };
+            img.onerror = () => {
+                console.error("Error loading image"); // Log if there was an error
+            };
+
+            gestureDisplay.appendChild(img);
+        });
+    
+        function getSelectedText() {
+            let selectedText = window.getSelection().toString();
+            return selectedText;
+        }
+
+        function deleteHighlightedWord() {
+            const gesturesDiv = document.getElementById('gestures');
+            const selectedText = getSelectedText();
+            
+            if (selectedText) {
+                let currentText = gesturesDiv.innerText;
+                const updatedText = currentText.replace(selectedText, '').trim(); // Remove the highlighted word
+                gesturesDiv.innerText = "Detected Gestures: " + updatedText; // Update the display with the new word
+
+                // Now send the updated word back as JSON
+                sendUpdatedWordAsJSON(updatedText);
+            }
+        }
+
+        function sendUpdatedWordAsJSON(updatedWord) {
+            fetch('/update_constructed_word', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ updated_word: updatedWord })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Updated word sent successfully:', data);
+            })
+            .catch(error => {
+                console.error('Error sending updated word:', error);
+            });
+        }
+
+    </script>
+</body>
+</html>
